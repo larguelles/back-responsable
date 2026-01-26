@@ -8,32 +8,32 @@ datasource db {
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
 
-  expenses    Expense[]
+  expenses  Expense[]
 }
 
 model Item {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
 
-  expenses    Expense[]
+  expenses  Expense[]
 }
 
 model Expense {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   amountCents Int
-  occuredAt   DateTime  @default(now())
-  createdAt   DateTime  @default(now())
+  occurredAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 
-  category    Category  @relation(fields: [categoryId], references: [id])
+  category    Category @relation(fields: [categoryId], references: [id])
   categoryId  String
 
-  item        Item      @relation(field: [itemId], references: [id])
-  itemId      String  
+  item        Item     @relation(fields: [itemId], references: [id])
+  itemId      String
 }
 
 
