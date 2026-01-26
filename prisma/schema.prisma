@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  createdAt   DateTime  @default(now())
+
+  expenses    Expense[]
+}
+
+model Item {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  createdAt   DateTime  @default(now())
+
+  expenses    Expense[]
+}
+
+model Expense {
+  id          String    @id @default(cuid())
+  amountCents Int
+  occuredAt   DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  category    Category  @relation(fields: [categoryId], references: [id])
+  categoryId  String
+
+  item        Item      @relation(field: [itemId], references: [id])
+  itemId      String  
+}
+
+
