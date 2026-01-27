@@ -17,6 +17,12 @@ const ChatBody = z.object({
   message: z.string().min(1).max(4000),
 });
 
+app.use((req, _res, next) => {
+  console.log(`[REQ] ${req.method} ${req.url}`);
+  next();
+});
+
+
 //POST Mensajes a la IA
 
 app.post('/chat', async (req, res) => {
@@ -41,7 +47,10 @@ const CreateExpenseBody = z.object({
   amountCents: z.number().int().positive(),
   categoryName: z.string().trim().min(1).max(80),
   itemName: z.string().trim().min(1).max(120),
-  occurredAt: z.iso.datetime().optional(),
+  occurredAt: z.string().refine(
+    (v) => !Number.isNaN(Date.parse(v)),
+    { message: "Invalid datetime" }
+  ).optional(),
 });
 
 //POST Gastos
