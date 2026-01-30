@@ -1,23 +1,23 @@
 // src/analysis/executePlan.ts
-import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
-import type { AnalysisPlan } from "../schemas/planSchema.js";
-import { resolveDateRange, type ResolvedRange } from "./range.js";
+import type { Prisma, PrismaClient } from '../generated/prisma/index.js';
+import type { AnalysisPlan } from '../schemas/planSchema.js';
+import { resolveDateRange, type ResolvedRange } from './range.js';
 
-type MetricOp = "sum" | "avg" | "count" | "min" | "max";
-type BreakdownOp = "sum" | "count";
-type GroupBy = "day" | "week" | "month" | "category" | "item";
+type MetricOp = 'sum' | 'avg' | 'count' | 'min' | 'max';
+type BreakdownOp = 'sum' | 'count';
+type GroupBy = 'day' | 'week' | 'month' | 'category' | 'item';
 
-type MetricResult = { kind: "metric"; op: MetricOp; value: number };
+type MetricResult = { kind: 'metric'; op: MetricOp; value: number };
 
 type BreakdownResult = {
-  kind: "breakdown";
+  kind: 'breakdown';
   groupBy: GroupBy;
   op: BreakdownOp;
   rows: Array<{ key: string; value: number }>;
 };
 
 type ListResult = {
-  kind: "list";
+  kind: 'list';
   items: Array<{
     id: string;
     amountCents: number;
@@ -28,10 +28,10 @@ type ListResult = {
   nextCursor?: string;
 };
 
-type CompareResult = { kind: "compare"; op: MetricOp; a: number; b: number };
+type CompareResult = { kind: 'compare'; op: MetricOp; a: number; b: number };
 
 type ForecastResult = {
-  kind: "forecast";
+  kind: 'forecast';
   horizonDays: number;
   predictedTotalCents: number;
   avgDailyCents: number;
@@ -48,8 +48,8 @@ type NormalizedFilters = {
   categoryName?: string;
   itemName?: string;
   match?: {
-    field: "categoryName" | "itemName" | "any";
-    op: "equals" | "contains";
+    field: 'categoryName' | 'itemName' | 'any';
+    op: 'equals' | 'contains';
     value: string;
   };
   amount?: {
@@ -61,15 +61,15 @@ type NormalizedFilters = {
 const isDefined = <T>(v: T | undefined): v is T => v !== undefined;
 
 const normalizeFilters = (raw: unknown): NormalizedFilters | undefined => {
-  if (!raw || typeof raw !== "object") return undefined;
+  if (!raw || typeof raw !== 'object') return undefined;
 
   const f = raw as {
     categoryName?: string | undefined;
     itemName?: string | undefined;
     match?:
       | {
-          field: "categoryName" | "itemName" | "any";
-          op: "equals" | "contains";
+          field: 'categoryName' | 'itemName' | 'any';
+          op: 'equals' | 'contains';
           value: string;
         }
       | undefined;
@@ -83,21 +83,21 @@ const normalizeFilters = (raw: unknown): NormalizedFilters | undefined => {
 
   const out: NormalizedFilters = {};
 
-  if (typeof f.categoryName === "string" && f.categoryName.length > 0) {
+  if (typeof f.categoryName === 'string' && f.categoryName.length > 0) {
     out.categoryName = f.categoryName;
   }
-  if (typeof f.itemName === "string" && f.itemName.length > 0) {
+  if (typeof f.itemName === 'string' && f.itemName.length > 0) {
     out.itemName = f.itemName;
   }
 
-  if (f.match && typeof f.match.value === "string" && f.match.value.length > 0) {
+  if (f.match && typeof f.match.value === 'string' && f.match.value.length > 0) {
     out.match = f.match;
   }
 
   if (f.amount) {
-    const amt: NormalizedFilters["amount"] = {};
-    if (typeof f.amount.gteCents === "number") amt.gteCents = f.amount.gteCents;
-    if (typeof f.amount.lteCents === "number") amt.lteCents = f.amount.lteCents;
+    const amt: NormalizedFilters['amount'] = {};
+    if (typeof f.amount.gteCents === 'number') amt.gteCents = f.amount.gteCents;
+    if (typeof f.amount.lteCents === 'number') amt.lteCents = f.amount.lteCents;
     if (Object.keys(amt).length) out.amount = amt;
   }
 
@@ -106,14 +106,14 @@ const normalizeFilters = (raw: unknown): NormalizedFilters | undefined => {
 
 const asDayKey = (d: Date) => {
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
 
 const asMonthKey = (d: Date) => {
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const m = String(d.getMonth() + 1).padStart(2, '0');
   return `${y}-${m}`;
 };
 
@@ -137,9 +137,7 @@ const buildOccurredAt = (resolved: ResolvedRange): Prisma.DateTimeFilter | undef
   return Object.keys(out).length ? out : undefined;
 };
 
-const buildAmountFilter = (
-  amount: NormalizedFilters["amount"]
-): Prisma.IntFilter | undefined => {
+const buildAmountFilter = (amount: NormalizedFilters['amount']): Prisma.IntFilter | undefined => {
   if (!amount) return undefined;
 
   const out: Prisma.IntFilter = {};
@@ -149,17 +147,11 @@ const buildAmountFilter = (
   return Object.keys(out).length ? out : undefined;
 };
 
-const buildNameFilter = (
-  op: "equals" | "contains",
-  value: string
-): Prisma.StringFilter => {
-  return op === "contains" ? { contains: value } : { equals: value };
+const buildNameFilter = (op: 'equals' | 'contains', value: string): Prisma.StringFilter => {
+  return op === 'contains' ? { contains: value } : { equals: value };
 };
 
-const buildWhere = (
-  resolved: ResolvedRange,
-  filtersRaw?: unknown
-): Prisma.ExpenseWhereInput => {
+const buildWhere = (resolved: ResolvedRange, filtersRaw?: unknown): Prisma.ExpenseWhereInput => {
   const filters = normalizeFilters(filtersRaw);
   const where: Prisma.ExpenseWhereInput = {};
 
@@ -181,9 +173,9 @@ const buildWhere = (
     const { field, op, value } = filters.match;
     const nameFilter = buildNameFilter(op, value);
 
-    if (field === "categoryName") {
+    if (field === 'categoryName') {
       where.category = { name: nameFilter } satisfies Prisma.CategoryWhereInput;
-    } else if (field === "itemName") {
+    } else if (field === 'itemName') {
       where.item = { name: nameFilter } satisfies Prisma.ItemWhereInput;
     } else {
       where.OR = [
@@ -199,64 +191,64 @@ const buildWhere = (
 const computeMetric = async (
   prisma: PrismaClient,
   op: MetricOp,
-  where: Prisma.ExpenseWhereInput
+  where: Prisma.ExpenseWhereInput,
 ): Promise<number> => {
-  if (op === "count") {
+  if (op === 'count') {
     return prisma.expense.count({ where });
   }
 
   const args: Prisma.ExpenseAggregateArgs = { where };
 
-  if (op === "sum") args._sum = { amountCents: true };
-  if (op === "avg") args._avg = { amountCents: true };
-  if (op === "min") args._min = { amountCents: true };
-  if (op === "max") args._max = { amountCents: true };
+  if (op === 'sum') args._sum = { amountCents: true };
+  if (op === 'avg') args._avg = { amountCents: true };
+  if (op === 'min') args._min = { amountCents: true };
+  if (op === 'max') args._max = { amountCents: true };
 
   const agg = await prisma.expense.aggregate(args);
 
-  if (op === "sum") return agg._sum?.amountCents ?? 0;
-  if (op === "avg") return Math.round(agg._avg?.amountCents ?? 0);
-  if (op === "min") return agg._min?.amountCents ?? 0;
-  if (op === "max") return agg._max?.amountCents ?? 0;
+  if (op === 'sum') return agg._sum?.amountCents ?? 0;
+  if (op === 'avg') return Math.round(agg._avg?.amountCents ?? 0);
+  if (op === 'min') return agg._min?.amountCents ?? 0;
+  if (op === 'max') return agg._max?.amountCents ?? 0;
 
   return 0;
 };
 
 const fetchExpensesForJsAggregation = async (
   prisma: PrismaClient,
-  where: Prisma.ExpenseWhereInput
+  where: Prisma.ExpenseWhereInput,
 ) => {
   return prisma.expense.findMany({
     where,
-    orderBy: { occurredAt: "desc" },
+    orderBy: { occurredAt: 'desc' },
     include: { category: true, item: true },
   });
 };
 
 export const executePlan = async (
   prisma: PrismaClient,
-  plan: AnalysisPlan
+  plan: AnalysisPlan,
 ): Promise<ExecuteResult> => {
-  if (plan.kind === "metric") {
+  if (plan.kind === 'metric') {
     const resolved = resolveDateRange(plan.range);
     const where = buildWhere(resolved, plan.filters);
     const value = await computeMetric(prisma, plan.op, where);
-    return { kind: "metric", op: plan.op, value };
+    return { kind: 'metric', op: plan.op, value };
   }
 
-  if (plan.kind === "list") {
+  if (plan.kind === 'list') {
     const resolved = resolveDateRange(plan.range);
     const where = buildWhere(resolved, plan.filters);
 
     const rows = await prisma.expense.findMany({
       where,
-      orderBy: { occurredAt: "desc" },
+      orderBy: { occurredAt: 'desc' },
       take: plan.limit,
       include: { category: true, item: true },
     });
 
     const result: ListResult = {
-      kind: "list",
+      kind: 'list',
       items: rows.map((r) => ({
         id: r.id,
         amountCents: r.amountCents,
@@ -269,7 +261,7 @@ export const executePlan = async (
     return result;
   }
 
-  if (plan.kind === "compare") {
+  if (plan.kind === 'compare') {
     const ra = resolveDateRange(plan.a);
     const rb = resolveDateRange(plan.b);
 
@@ -281,10 +273,10 @@ export const executePlan = async (
       computeMetric(prisma, plan.op, whereB),
     ]);
 
-    return { kind: "compare", op: plan.op, a, b };
+    return { kind: 'compare', op: plan.op, a, b };
   }
 
-  if (plan.kind === "breakdown") {
+  if (plan.kind === 'breakdown') {
     const resolved = resolveDateRange(plan.range);
     const where = buildWhere(resolved, plan.filters);
 
@@ -295,27 +287,27 @@ export const executePlan = async (
     for (const e of expenses) {
       let key: string;
 
-      if (plan.groupBy === "day") key = asDayKey(e.occurredAt);
-      else if (plan.groupBy === "week") key = asWeekKey(e.occurredAt);
-      else if (plan.groupBy === "month") key = asMonthKey(e.occurredAt);
-      else if (plan.groupBy === "category") key = e.category.name;
+      if (plan.groupBy === 'day') key = asDayKey(e.occurredAt);
+      else if (plan.groupBy === 'week') key = asWeekKey(e.occurredAt);
+      else if (plan.groupBy === 'month') key = asMonthKey(e.occurredAt);
+      else if (plan.groupBy === 'category') key = e.category.name;
       else key = e.item.name;
 
-      const inc = plan.op === "count" ? 1 : e.amountCents;
+      const inc = plan.op === 'count' ? 1 : e.amountCents;
       buckets.set(key, (buckets.get(key) ?? 0) + inc);
     }
 
     let rows = Array.from(buckets.entries()).map(([key, value]) => ({ key, value }));
 
-    if (plan.groupBy === "day" || plan.groupBy === "week" || plan.groupBy === "month") {
+    if (plan.groupBy === 'day' || plan.groupBy === 'week' || plan.groupBy === 'month') {
       rows.sort((a, b) => (a.key < b.key ? 1 : -1));
     } else {
-      rows.sort((a, b) => (b.value - a.value) || a.key.localeCompare(b.key));
+      rows.sort((a, b) => b.value - a.value || a.key.localeCompare(b.key));
     }
 
     if (isDefined(plan.limit)) rows = rows.slice(0, plan.limit);
 
-    return { kind: "breakdown", groupBy: plan.groupBy, op: plan.op, rows };
+    return { kind: 'breakdown', groupBy: plan.groupBy, op: plan.op, rows };
   }
 
   // forecast
@@ -338,8 +330,8 @@ export const executePlan = async (
             Math.ceil(
               (resolvedHistory.to.getTime() - resolvedHistory.from.getTime()) /
                 (24 * 60 * 60 * 1000) +
-                1
-            )
+                1,
+            ),
           )
         : Math.max(1, perDay.size);
 
@@ -348,7 +340,7 @@ export const executePlan = async (
     const predictedTotalCents = avgDailyCents * plan.horizonDays;
 
     return {
-      kind: "forecast",
+      kind: 'forecast',
       horizonDays: plan.horizonDays,
       predictedTotalCents,
       avgDailyCents,

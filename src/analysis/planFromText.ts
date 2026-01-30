@@ -1,6 +1,6 @@
 // src/analysis/planFromText.ts
-import OpenAI from "openai";
-import { AnalysisPlanSchema, type AnalysisPlan } from "../schemas/planSchema.js";
+import OpenAI from 'openai';
+import { AnalysisPlanSchema, type AnalysisPlan } from '../schemas/planSchema.js';
 
 export const planFromText = async (args: {
   client: OpenAI;
@@ -31,27 +31,27 @@ ${args.question}
 `.trim();
 
   const resp = await args.client.responses.create({
-    model: "gpt-4o-mini",
+    model: 'gpt-4o-mini',
     input: prompt,
   });
 
-  const text = resp.output_text ?? "";
+  const text = resp.output_text ?? '';
   let json: unknown;
   try {
     json = JSON.parse(text);
   } catch {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
     if (start >= 0 && end > start) {
       json = JSON.parse(text.slice(start, end + 1));
     } else {
-      throw new Error("LLM did not return JSON");
+      throw new Error('LLM did not return JSON');
     }
   }
 
   const parsed = AnalysisPlanSchema.safeParse(json);
   if (!parsed.success) {
-    throw new Error("LLM returned invalid plan");
+    throw new Error('LLM returned invalid plan');
   }
 
   return parsed.data;
