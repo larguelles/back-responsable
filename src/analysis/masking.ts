@@ -47,6 +47,7 @@ type TokenMap = {
       return out;
     };
   
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const unmaskPlan = <T extends Record<string, any>>(plan: T): T => {
       const clone = structuredClone(plan);
   
