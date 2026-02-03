@@ -1,4 +1,3 @@
-// src/server.ts
 import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
@@ -25,6 +24,15 @@ app.use((req, _res, next) => {
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const client = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
+const nameKey = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const looksLikeForecastIntent = (q: string) => {
+  const s = q.toLowerCase();
+  return /(forecast|predict|estimate|expected|projection|next month|in the next\s+\d+\s+days|pr[oó]xim|en los pr[oó]ximos|dentro de\s+\d+\s+d[ií]as)/.test(
+    s,
+  );
+};
+
 const ChatBody = z.object({
   message: z.string().min(1).max(4000),
 });
@@ -42,7 +50,8 @@ app.post('/chat', async (req, res) => {
     });
 
     return res.json({ text: response.output_text ?? '' });
-  } catch {
+  } catch (err) {
+    console.error('POST /chat failed:', err);
     return res.status(500).json({ error: 'OpenAI request failed' });
   }
 });
@@ -57,6 +66,50 @@ const CreateExpenseBody = z.object({
     .optional(),
 });
 
+async function assertNoCategoryItemNameCollision(args: {
+  categoryName: string;
+  itemName: string;
+}) {
+  const catKey = nameKey(args.categoryName);
+  const itemKey = nameKey(args.itemName);
+
+  if (catKey === itemKey) {
+    return {
+      ok: false as const,
+      code: 'CATEGORY_ITEM_SAME_NAME' as const,
+      message: 'Category name and item name cannot be the same.',
+    };
+  }
+  
+  const [cats, items] = await Promise.all([
+    prisma.category.findMany({ select: { name: true } }),
+    prisma.item.findMany({ select: { name: true } }),
+  ]);
+
+  const catKeys = new Set(cats.map((c) => nameKey(c.name)));
+  const itemKeys = new Set(items.map((i) => nameKey(i.name)));
+
+  if (itemKeys.has(catKey)) {
+    return {
+      ok: false as const,
+      code: 'CATEGORY_NAME_CONFLICT' as const,
+      message:
+        'This category name already exists as an item name. Choose a different name.',
+    };
+  }
+
+  if (catKeys.has(itemKey)) {
+    return {
+      ok: false as const,
+      code: 'ITEM_NAME_CONFLICT' as const,
+      message:
+        'This item name already exists as a category name. Choose a different name.',
+    };
+  }
+
+  return { ok: true as const };
+}
+
 app.post('/expenses', async (req, res) => {
   const parsed = CreateExpenseBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Invalid body' });
@@ -64,6 +117,17 @@ app.post('/expenses', async (req, res) => {
   const { amountCents, categoryName, itemName, occurredAt } = parsed.data;
 
   try {
+    const collision = await assertNoCategoryItemNameCollision({
+      categoryName,
+      itemName,
+    });
+    if (!collision.ok) {
+      return res.status(409).json({
+        error: collision.code,
+        message: collision.message,
+      });
+    }
+
     const category = await prisma.category.upsert({
       where: { name: categoryName },
       update: {},
@@ -95,7 +159,9 @@ app.post('/expenses', async (req, res) => {
 
 app.get('/categories', async (_req, res) => {
   try {
-    const categories = await prisma.category.findMany({ orderBy: { name: 'asc' } });
+    const categories = await prisma.category.findMany({
+      orderBy: { name: 'asc' },
+    });
     return res.json({ categories });
   } catch (err) {
     console.error('GET /categories failed: ', err);
@@ -122,7 +188,8 @@ app.get('/expenses', async (req, res) => {
 
   if (fromStr && Number.isNaN(from!.getTime()))
     return res.status(400).json({ error: 'Invalid from' });
-  if (toStr && Number.isNaN(to!.getTime())) return res.status(400).json({ error: 'Invalid to' });
+  if (toStr && Number.isNaN(to!.getTime()))
+    return res.status(400).json({ error: 'Invalid to' });
 
   try {
     const expenses = await prisma.expense.findMany({
@@ -151,13 +218,6 @@ app.post('/analysis/run', async (req, res) => {
 
   try {
     const plan = parsed.data.plan;
-    const tz = (() => {
-      if (plan.kind === 'compare')
-        return plan.a.timezone ?? plan.b.timezone ?? 'America/Argentina/Buenos_Aires';
-      if (plan.kind === 'forecast')
-        return plan.historyRange.timezone ?? 'America/Argentina/Buenos_Aires';
-      return plan.range.timezone ?? 'America/Argentina/Buenos_Aires';
-    })();
 
     if (plan.kind === 'compare') {
       resolveDateRange(plan.a);
@@ -195,6 +255,19 @@ app.post('/analysis/plan', async (req, res) => {
       prisma.item.findMany({ select: { name: true } }),
     ]);
 
+    const catKeys = new Set(cats.map((c) => nameKey(c.name)));
+    const collisions = items
+      .map((i) => i.name)
+      .filter((n) => catKeys.has(nameKey(n)));
+    if (collisions.length > 0) {
+      return res.status(409).json({
+        error: 'AMBIGUOUS_NAMES',
+        message:
+          'There are names shared between categories and items. Rename them to be unique.',
+        names: Array.from(new Set(collisions)).slice(0, 20),
+      });
+    }
+
     const masking = buildMasking({
       categories: cats.map((c) => c.name),
       items: items.map((i) => i.name),
@@ -211,13 +284,41 @@ app.post('/analysis/plan', async (req, res) => {
     const plan = masking.unmaskPlan(planMasked);
 
     const planParsed = AnalysisPlanSchema.safeParse(plan);
-    if (!planParsed.success) return res.status(400).json({ error: 'Plan invalid after unmask' });
+    if (!planParsed.success) {
+      return res.status(400).json({
+        error: 'PLAN_INVALID_AFTER_UNMASK',
+      });
+    }
+
+    const forecastIntent = looksLikeForecastIntent(parsed.data.question);
+    if (planParsed.data.kind === 'forecast' && !forecastIntent) {
+      return res.status(400).json({
+        error: 'FORECAST_NOT_ALLOWED',
+        message:
+          'Forecast returned for a non-forecast question. Please rephrase or use metric/breakdown.',
+      });
+    }
 
     return res.json({ plan: planParsed.data });
-  } catch (err) {
+  } catch (err: unknown) {
+    let code: string | undefined;
+    if (typeof err === 'object' && err !== null) {
+      const e = err as { code?: string; error?: { code?: string } };
+      code = e.code ?? e.error?.code;
+    }
+  
+    if (code === 'insufficient_quota') {
+      return res.status(402).json({
+        error: 'LLM_QUOTA',
+        message:
+          'OpenAI API quota/billing exhausted for this project. Enable billing or use manual mode.',
+      });
+    }
+  
     console.error('POST /analysis/plan failed:', err);
     return res.status(500).json({ error: 'Failed to build plan' });
   }
+  
 });
 
 app.listen(3000, () => {
