@@ -37,23 +37,23 @@ User question:
 ${args.question}
 `.trim();
 
-const resp = await args.client.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: [
-    { role: "system", content: "Return only valid JSON. No markdown. No commentary." },
-    { role: "user", content: prompt },
-  ],
-  response_format: { type: "json_object" },
-  temperature: 0,
-});
+  const resp = await args.client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: 'Return only valid JSON. No markdown. No commentary.' },
+      { role: 'user', content: prompt },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0,
+  });
 
-const text = resp.choices[0]?.message?.content ?? "";
-const json = JSON.parse(text);
+  const text = resp.choices[0]?.message?.content ?? '';
+  const json = JSON.parse(text);
 
-const parsed = AnalysisPlanSchema.safeParse(json);
-if (!parsed.success) {
-  console.error("LLM raw output:", text);
-  throw new Error(`LLM returned invalid plan: ${parsed.error.message}`);
-}
-return parsed.data;
+  const parsed = AnalysisPlanSchema.safeParse(json);
+  if (!parsed.success) {
+    console.error('LLM raw output:', text);
+    throw new Error(`LLM returned invalid plan: ${parsed.error.message}`);
+  }
+  return parsed.data;
 };

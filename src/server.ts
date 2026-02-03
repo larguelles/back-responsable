@@ -66,10 +66,7 @@ const CreateExpenseBody = z.object({
     .optional(),
 });
 
-async function assertNoCategoryItemNameCollision(args: {
-  categoryName: string;
-  itemName: string;
-}) {
+async function assertNoCategoryItemNameCollision(args: { categoryName: string; itemName: string }) {
   const catKey = nameKey(args.categoryName);
   const itemKey = nameKey(args.itemName);
 
@@ -80,7 +77,7 @@ async function assertNoCategoryItemNameCollision(args: {
       message: 'Category name and item name cannot be the same.',
     };
   }
-  
+
   const [cats, items] = await Promise.all([
     prisma.category.findMany({ select: { name: true } }),
     prisma.item.findMany({ select: { name: true } }),
@@ -93,8 +90,7 @@ async function assertNoCategoryItemNameCollision(args: {
     return {
       ok: false as const,
       code: 'CATEGORY_NAME_CONFLICT' as const,
-      message:
-        'This category name already exists as an item name. Choose a different name.',
+      message: 'This category name already exists as an item name. Choose a different name.',
     };
   }
 
@@ -102,8 +98,7 @@ async function assertNoCategoryItemNameCollision(args: {
     return {
       ok: false as const,
       code: 'ITEM_NAME_CONFLICT' as const,
-      message:
-        'This item name already exists as a category name. Choose a different name.',
+      message: 'This item name already exists as a category name. Choose a different name.',
     };
   }
 
@@ -188,8 +183,7 @@ app.get('/expenses', async (req, res) => {
 
   if (fromStr && Number.isNaN(from!.getTime()))
     return res.status(400).json({ error: 'Invalid from' });
-  if (toStr && Number.isNaN(to!.getTime()))
-    return res.status(400).json({ error: 'Invalid to' });
+  if (toStr && Number.isNaN(to!.getTime())) return res.status(400).json({ error: 'Invalid to' });
 
   try {
     const expenses = await prisma.expense.findMany({
@@ -256,14 +250,11 @@ app.post('/analysis/plan', async (req, res) => {
     ]);
 
     const catKeys = new Set(cats.map((c) => nameKey(c.name)));
-    const collisions = items
-      .map((i) => i.name)
-      .filter((n) => catKeys.has(nameKey(n)));
+    const collisions = items.map((i) => i.name).filter((n) => catKeys.has(nameKey(n)));
     if (collisions.length > 0) {
       return res.status(409).json({
         error: 'AMBIGUOUS_NAMES',
-        message:
-          'There are names shared between categories and items. Rename them to be unique.',
+        message: 'There are names shared between categories and items. Rename them to be unique.',
         names: Array.from(new Set(collisions)).slice(0, 20),
       });
     }
@@ -306,7 +297,7 @@ app.post('/analysis/plan', async (req, res) => {
       const e = err as { code?: string; error?: { code?: string } };
       code = e.code ?? e.error?.code;
     }
-  
+
     if (code === 'insufficient_quota') {
       return res.status(402).json({
         error: 'LLM_QUOTA',
@@ -314,11 +305,10 @@ app.post('/analysis/plan', async (req, res) => {
           'OpenAI API quota/billing exhausted for this project. Enable billing or use manual mode.',
       });
     }
-  
+
     console.error('POST /analysis/plan failed:', err);
     return res.status(500).json({ error: 'Failed to build plan' });
   }
-  
 });
 
 app.listen(3000, () => {
